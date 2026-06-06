@@ -1,0 +1,55 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.hotelos'
+version = '0.0.1-SNAPSHOT'
+description = 'reception-service'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 1. SPRING BOOT CORE & WEB
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // 1.1 INPUT VALIDATION (Bean Validation - @Valid, @NotNull, @Min, @Pattern)
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // 2. NAVBAT VA KESH
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // 3. SWAGGER / OPENAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+
+    // 4. DATABASE & JSON TOOLS
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.19.0')
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // 5. LOMBOK
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // 6. TESTING
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
