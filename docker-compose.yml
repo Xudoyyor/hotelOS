@@ -1,0 +1,194 @@
+# ==========================================================================
+# HotelOS - mikroservislar orkestratsiyasi
+# Infratuzilma: PostgreSQL (har servisga alohida DB), RabbitMQ (hotel.exchange), Redis.
+# ==========================================================================
+services:
+
+  # ---------------------- Infratuzilma ----------------------
+  hotelos-db:
+    image: postgres:15-alpine
+    container_name: hotelos-db
+    environment:
+      POSTGRES_USER: hudoyor
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: hotelos_db
+    ports:
+      - "5555:5432"
+    volumes:
+      - hotelos-pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hudoyor -d hotelos_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hotelos-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: hotel_guest
+      RABBITMQ_DEFAULT_PASS: hotel_secret
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hotelos-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hotelos-network
+
+  # ---------------------- Mikroservislar ----------------------
+  gateway-service:
+    build: ./gateway-service/gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+      SPRING_DATA_REDIS_HOST: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - hotelos-network
+
+  auth-service:
+    build: ./auth-service/auth-service
+    container_name: auth-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+    depends_on:
+      hotelos-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+  reception-service:
+    build: ./reception-service/reception-service
+    container_name: reception-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+      SPRING_DATA_REDIS_HOST: redis
+    depends_on:
+      hotelos-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+  housekeeping-service:
+    build: ./housekeeping-service/housekeeping-service
+    container_name: housekeeping-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+    depends_on:
+      hotelos-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+  room-service:
+    build: ./room-service/room-service
+    container_name: room-service
+    ports:
+      - "9094:9094"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+    depends_on:
+      hotelos-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+  maintenance-service:
+    build: ./maintenance-service/maintenance-service
+    container_name: maintenance-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+    depends_on:
+      hotelos-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+  dashboard-service:
+    build: ./dashboard-service/dashboard-service
+    container_name: dashboard-service
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: hotel_guest
+      SPRING_RABBITMQ_PASSWORD: hotel_secret
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hotelos-network
+
+networks:
+  hotelos-network:
+    driver: bridge
+
+volumes:
+  hotelos-pgdata:
